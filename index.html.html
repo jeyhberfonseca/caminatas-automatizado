@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caminatas Automatizado - Prueba de voz</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:20px}
+.contenedor{max-width:520px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+h1{text-align:center;font-size:24px}.pregunta{font-size:20px;font-weight:bold;margin:25px 0 15px}
+.resultado{min-height:55px;border:1px solid #ccc;border-radius:8px;padding:15px;font-size:18px;background:#fafafa}
+button{width:100%;padding:16px;margin-top:15px;font-size:18px;border:0;border-radius:8px;cursor:pointer}
+.voz{background:#1976d2;color:#fff}.limpiar{background:#777;color:#fff}
+.estado{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}
+.nota{font-size:14px;color:#555;margin-top:20px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="contenedor">
+<h1>🎙️ Caminatas Automatizado</h1>
+<div class="estado" id="estado">Listo para comenzar</div>
+<div class="pregunta">¿Cuál es el nombre del paciente?</div>
+<div class="resultado" id="resultado">Aquí aparecerá lo que digas...</div>
+<button class="voz" onclick="escuchar()">🎙️ RESPONDER POR VOZ</button>
+<button class="limpiar" onclick="limpiar()">Limpiar</button>
+<div class="nota">Esta es solamente la primera prueba. Todavía no guarda datos en Google Sheets. Primero comprobaremos que el reconocimiento de voz funciona correctamente.</div>
+</div>
+<script>
+function escuchar(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    document.getElementById("estado").innerText="❌ Este navegador no admite reconocimiento de voz.";
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang="es-CO";
+  recognition.continuous=false;
+  recognition.interimResults=false;
+  recognition.maxAlternatives=1;
+  recognition.onstart=function(){
+    document.getElementById("estado").innerText="🎙️ ESCUCHANDO... HABLA AHORA";
+  };
+  recognition.onresult=function(event){
+    const texto=event.results[0][0].transcript;
+    document.getElementById("resultado").innerText=texto;
+    document.getElementById("estado").innerText="✅ Respuesta capturada";
+  };
+  recognition.onerror=function(event){
+    document.getElementById("estado").innerText="❌ Error: "+event.error;
+  };
+  recognition.onend=function(){console.log("Reconocimiento finalizado");};
+  try{recognition.start();}
+  catch(error){document.getElementById("estado").innerText="❌ No se pudo iniciar: "+error.message;}
+}
+function limpiar(){
+  document.getElementById("resultado").innerText="Aquí aparecerá lo que digas...";
+  document.getElementById("estado").innerText="Listo para comenzar";
+}
+</script>
+</body>
+</html>
