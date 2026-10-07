@@ -11,9 +11,7 @@ h1{text-align:center;font-size:24px}
 .pregunta{font-size:22px;font-weight:bold;margin:25px 0 15px}
 .resultado{min-height:60px;border:1px solid #ccc;border-radius:8px;padding:15px;font-size:19px;background:#fafafa}
 button{width:100%;padding:16px;margin-top:15px;font-size:18px;border:0;border-radius:8px;cursor:pointer}
-.iniciar{background:#2e7d32;color:#fff}
-.repetir{background:#1976d2;color:#fff}
-.detener{background:#777;color:#fff}
+.iniciar{background:#2e7d32;color:#fff}.repetir{background:#1976d2;color:#fff}.detener{background:#777;color:#fff}
 .estado{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}
 .historial{margin-top:25px;border-top:1px solid #ddd;padding-top:15px}
 .item{padding:10px 0;border-bottom:1px solid #eee}
@@ -24,11 +22,8 @@ button{width:100%;padding:16px;margin-top:15px;font-size:18px;border:0;border-ra
 <body>
 <div class="contenedor">
 <h1>🎙️ Caminatas Automatizado</h1>
-
 <div class="estado" id="estado">Pulsa INICIAR para comenzar</div>
-
 <div class="pregunta" id="pregunta">Preparado</div>
-
 <div class="resultado" id="resultado">Aquí aparecerá tu respuesta...</div>
 
 <button class="iniciar" id="btnIniciar" onclick="iniciar()">▶️ INICIAR CUESTIONARIO</button>
@@ -41,7 +36,7 @@ button{width:100%;padding:16px;margin-top:15px;font-size:18px;border:0;border-ra
 </div>
 
 <div class="nota">
-Conversación automática: la aplicación pregunta, escucha la respuesta y pasa sola a la siguiente pregunta. Esta prueba contiene nombre, edad y peso.
+La aplicación pregunta, espera a que termine de hablar, deja un pequeño silencio y luego escucha solamente tu respuesta.
 </div>
 </div>
 
@@ -56,49 +51,21 @@ let indice = 0;
 let respuestas = {};
 let reconocimiento = null;
 let activa = false;
+let procesando = false;
 
 function estado(texto){
   document.getElementById("estado").innerText = texto;
 }
 
-function hablarPregunta(){
-  if(!activa) return;
-
-  const texto = preguntas[indice].texto;
-
-  document.getElementById("pregunta").innerText = texto;
-  document.getElementById("resultado").innerText = "Esperando respuesta...";
-
-  window.speechSynthesis.cancel();
-
-  const voz = new SpeechSynthesisUtterance(texto);
-  voz.lang = "es-CO";
-  voz.rate = 0.95;
-  voz.pitch = 1;
-
-  voz.onstart = function(){
-    estado("🔊 Haciendo la pregunta...");
-  };
-
-  voz.onend = function(){
-    if(activa){
-      estado("🎙️ Escuchando... habla ahora");
-      iniciarEscucha();
-    }
-  };
-
-  window.speechSynthesis.speak(voz);
-}
-
 function iniciar(){
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if(!SpeechRecognition){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
     estado("❌ Este navegador no admite reconocimiento de voz.");
     return;
   }
 
   activa = true;
+  procesando = false;
   indice = 0;
   respuestas = {};
 
@@ -107,68 +74,110 @@ function iniciar(){
   document.getElementById("btnDetener").classList.remove("oculto");
   document.getElementById("historial").innerHTML = "";
 
-  // La primera pregunta se inicia por la acción del usuario.
-  hablarPregunta();
+  preguntar();
+}
+
+function preguntar(){
+  if(!activa || indice >= preguntas.length){
+    finalizar();
+    return;
+  }
+
+  procesando = false;
+
+  const texto = preguntas[indice].texto;
+
+  document.getElementById("pregunta").innerText = texto;
+  document.getElementById("resultado").innerText = "Escuchando tu respuesta después de la pregunta...";
+
+  window.speechSynthesis.cancel();
+
+  const voz = new SpeechSynthesisUtterance(texto);
+  voz.lang = "es-CO";
+  voz.rate = 0.9;
+  voz.pitch = 1;
+
+  voz.onstart = function(){
+    estado("🔊 Haciendo la pregunta...");
+  };
+
+  voz.onend = function(){
+    if(!activa) return;
+
+    // Espera para evitar que el reconocimiento capture la propia pregunta.
+    estado("⏳ Espera un momento...");
+    setTimeout(function(){
+      if(activa && !procesando){
+        iniciarEscucha();
+      }
+    }, 1200);
+  };
+
+  window.speechSynthesis.speak(voz);
 }
 
 function iniciarEscucha(){
-  if(!activa) return;
+  if(!activa || procesando) return;
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  reconocimiento = new SR();
 
-  reconocimiento = new SpeechRecognition();
   reconocimiento.lang = "es-CO";
   reconocimiento.continuous = false;
   reconocimiento.interimResults = false;
   reconocimiento.maxAlternatives = 1;
 
   reconocimiento.onstart = function(){
-    estado("🎙️ Escuchando... habla ahora");
+    estado("🎙️ ESCUCHANDO... HABLA AHORA");
+    document.getElementById("resultado").innerText = "🎙️ Puedes responder...";
   };
 
   reconocimiento.onresult = function(event){
+    if(procesando) return;
+
     const texto = event.results[0][0].transcript.trim();
 
-    if(!texto) {
-      estado("⚠️ No escuché una respuesta.");
-      setTimeout(hablarPregunta, 700);
-      return;
-    }
+    if(!texto) return;
+
+    procesando = true;
 
     const pregunta = preguntas[indice];
     respuestas[pregunta.campo] = texto;
 
     document.getElementById("resultado").innerText = texto;
     agregarHistorial(pregunta.texto, texto);
-
     estado("✅ Respuesta capturada");
 
-    // Pasa automáticamente a la siguiente pregunta.
+    if(reconocimiento){
+      try{ reconocimiento.stop(); }catch(e){}
+    }
+
+    // Da tiempo para que termine de procesar antes de la siguiente pregunta.
     setTimeout(function(){
+      if(!activa) return;
+
       indice++;
 
       if(indice >= preguntas.length){
         finalizar();
-      } else {
-        hablarPregunta();
+      }else{
+        preguntar();
       }
-    }, 900);
+    }, 1200);
   };
 
   reconocimiento.onerror = function(event){
-    console.log("Error de reconocimiento:", event.error);
+    if(!activa || procesando) return;
 
-    if(!activa) return;
+    console.log("Error:", event.error);
 
     if(event.error === "no-speech"){
-      estado("⚠️ No detecté voz. Vuelvo a preguntar.");
-      setTimeout(hablarPregunta, 700);
+      estado("⚠️ No detecté respuesta. Volveré a preguntar.");
+      setTimeout(preguntar, 1000);
       return;
     }
 
-    if(event.error === "aborted"){
-      return;
-    }
+    if(event.error === "aborted") return;
 
     estado("❌ Error de voz: " + event.error);
   };
@@ -189,18 +198,24 @@ function repetirPregunta(){
 
   if(reconocimiento){
     try{ reconocimiento.abort(); }catch(e){}
+    reconocimiento = null;
   }
 
-  hablarPregunta();
+  window.speechSynthesis.cancel();
+  procesando = false;
+
+  setTimeout(preguntar, 300);
 }
 
 function detener(){
   activa = false;
+  procesando = true;
 
   window.speechSynthesis.cancel();
 
   if(reconocimiento){
     try{ reconocimiento.abort(); }catch(e){}
+    reconocimiento = null;
   }
 
   estado("⏹️ Cuestionario detenido");
@@ -215,11 +230,13 @@ function agregarHistorial(pregunta, respuesta){
 
 function finalizar(){
   activa = false;
+  procesando = true;
 
   window.speechSynthesis.cancel();
 
   if(reconocimiento){
     try{ reconocimiento.abort(); }catch(e){}
+    reconocimiento = null;
   }
 
   document.getElementById("pregunta").innerText = "✅ Preguntas terminadas";
@@ -230,8 +247,6 @@ function finalizar(){
   document.getElementById("btnDetener").classList.add("oculto");
   document.getElementById("btnIniciar").classList.remove("oculto");
   document.getElementById("btnIniciar").innerText = "🔄 NUEVA PRUEBA";
-
-  console.log("RESPUESTAS:", respuestas);
 }
 </script>
 </body>
