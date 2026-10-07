@@ -7,16 +7,12 @@
 <style>
 body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:20px}
 .contenedor{max-width:560px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
-h1{text-align:center;font-size:24px}
-.pregunta{font-size:22px;font-weight:bold;margin:25px 0 15px}
+h1{text-align:center;font-size:24px}.pregunta{font-size:22px;font-weight:bold;margin:25px 0 15px}
 .resultado{min-height:60px;border:1px solid #ccc;border-radius:8px;padding:15px;font-size:19px;background:#fafafa}
 button{width:100%;padding:16px;margin-top:15px;font-size:18px;border:0;border-radius:8px;cursor:pointer}
 .iniciar{background:#2e7d32;color:#fff}.repetir{background:#1976d2;color:#fff}.detener{background:#777;color:#fff}
-.estado{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}
-.historial{margin-top:25px;border-top:1px solid #ddd;padding-top:15px}
-.item{padding:10px 0;border-bottom:1px solid #eee}
-.nota{font-size:14px;color:#555;margin-top:20px;line-height:1.5}
-.oculto{display:none}
+.estado{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}.historial{margin-top:25px;border-top:1px solid #ddd;padding-top:15px}
+.item{padding:10px 0;border-bottom:1px solid #eee}.nota{font-size:14px;color:#555;margin-top:20px;line-height:1.5}.oculto{display:none}
 </style>
 </head>
 <body>
@@ -30,223 +26,232 @@ button{width:100%;padding:16px;margin-top:15px;font-size:18px;border:0;border-ra
 <button class="repetir oculto" id="btnRepetir" onclick="repetirPregunta()">🔊 REPETIR PREGUNTA</button>
 <button class="detener oculto" id="btnDetener" onclick="detener()">⏹️ DETENER</button>
 
-<div class="historial">
-<strong>Respuestas:</strong>
-<div id="historial"></div>
-</div>
+<div class="historial"><strong>Respuestas:</strong><div id="historial"></div></div>
 
 <div class="nota">
-La aplicación pregunta, espera a que termine de hablar, deja un pequeño silencio y luego escucha solamente tu respuesta.
+La aplicación espera a que termine la pregunta, escucha una respuesta completa y convierte las edades y pesos hablados a números.
 </div>
 </div>
 
 <script>
-const preguntas = [
-  {campo:"nombre", texto:"¿Cuál es el nombre del paciente?"},
-  {campo:"edad", texto:"¿Cuál es la edad del paciente?"},
-  {campo:"peso", texto:"¿Cuál es el peso del paciente en kilogramos?"}
+const preguntas=[
+ {campo:"nombre",texto:"¿Cuál es el nombre del paciente?",tipo:"texto"},
+ {campo:"edad",texto:"¿Cuál es la edad del paciente?",tipo:"numero"},
+ {campo:"peso",texto:"¿Cuál es el peso del paciente en kilogramos?",tipo:"numero"}
 ];
 
-let indice = 0;
-let respuestas = {};
-let reconocimiento = null;
-let activa = false;
-let procesando = false;
+let indice=0,respuestas={},reconocimiento=null,activa=false,procesando=false,silencioTimer=null,reintentos=0;
+let textoReconocido="";
 
-function estado(texto){
-  document.getElementById("estado").innerText = texto;
-}
+function estado(t){document.getElementById("estado").innerText=t;}
 
 function iniciar(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){
-    estado("❌ Este navegador no admite reconocimiento de voz.");
-    return;
-  }
-
-  activa = true;
-  procesando = false;
-  indice = 0;
-  respuestas = {};
-
-  document.getElementById("btnIniciar").classList.add("oculto");
-  document.getElementById("btnRepetir").classList.remove("oculto");
-  document.getElementById("btnDetener").classList.remove("oculto");
-  document.getElementById("historial").innerHTML = "";
-
-  preguntar();
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){estado("❌ Chrome no admite reconocimiento de voz en este dispositivo.");return;}
+ activa=true;procesando=false;indice=0;respuestas={};reintentos=0;
+ document.getElementById("btnIniciar").classList.add("oculto");
+ document.getElementById("btnRepetir").classList.remove("oculto");
+ document.getElementById("btnDetener").classList.remove("oculto");
+ document.getElementById("historial").innerHTML="";
+ preguntar();
 }
 
 function preguntar(){
-  if(!activa || indice >= preguntas.length){
-    finalizar();
-    return;
-  }
+ if(!activa||indice>=preguntas.length){finalizar();return;}
+ procesando=false;textoReconocido="";reintentos=0;
+ const p=preguntas[indice];
+ document.getElementById("pregunta").innerText=p.texto;
+ document.getElementById("resultado").innerText="Esperando respuesta...";
+ window.speechSynthesis.cancel();
 
-  procesando = false;
-
-  const texto = preguntas[indice].texto;
-
-  document.getElementById("pregunta").innerText = texto;
-  document.getElementById("resultado").innerText = "Escuchando tu respuesta después de la pregunta...";
-
-  window.speechSynthesis.cancel();
-
-  const voz = new SpeechSynthesisUtterance(texto);
-  voz.lang = "es-CO";
-  voz.rate = 0.9;
-  voz.pitch = 1;
-
-  voz.onstart = function(){
-    estado("🔊 Haciendo la pregunta...");
-  };
-
-  voz.onend = function(){
-    if(!activa) return;
-
-    // Espera para evitar que el reconocimiento capture la propia pregunta.
-    estado("⏳ Espera un momento...");
-    setTimeout(function(){
-      if(activa && !procesando){
-        iniciarEscucha();
-      }
-    }, 1200);
-  };
-
-  window.speechSynthesis.speak(voz);
+ const voz=new SpeechSynthesisUtterance(p.texto);
+ voz.lang="es-CO";voz.rate=.88;voz.pitch=1;
+ voz.onstart=()=>estado("🔊 Haciendo la pregunta...");
+ voz.onend=()=>{
+   if(!activa)return;
+   estado("⏳ Prepárate para responder...");
+   setTimeout(()=>{if(activa&&!procesando)iniciarEscucha();},1400);
+ };
+ window.speechSynthesis.speak(voz);
 }
 
 function iniciarEscucha(){
-  if(!activa || procesando) return;
+ if(!activa||procesando)return;
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ reconocimiento=new SR();
+ reconocimiento.lang="es-CO";
+ reconocimiento.continuous=true;
+ reconocimiento.interimResults=true;
+ reconocimiento.maxAlternatives=1;
+ textoReconocido="";
 
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  reconocimiento = new SR();
+ reconocimiento.onstart=()=>{
+   estado("🎙️ ESCUCHANDO... habla con naturalidad");
+   document.getElementById("resultado").innerText="🎙️ Te estoy escuchando...";
+ };
 
-  reconocimiento.lang = "es-CO";
-  reconocimiento.continuous = false;
-  reconocimiento.interimResults = false;
-  reconocimiento.maxAlternatives = 1;
+ reconocimiento.onresult=(event)=>{
+   let provisional="";
+   for(let i=event.resultIndex;i<event.results.length;i++){
+     const texto=event.results[i][0].transcript.trim();
+     if(event.results[i].isFinal) textoReconocido+=" "+texto;
+     else provisional+=" "+texto;
+   }
+   const mostrar=(textoReconocido+" "+provisional).trim();
+   if(mostrar)document.getElementById("resultado").innerText=mostrar;
 
-  reconocimiento.onstart = function(){
-    estado("🎙️ ESCUCHANDO... HABLA AHORA");
-    document.getElementById("resultado").innerText = "🎙️ Puedes responder...";
-  };
+   clearTimeout(silencioTimer);
+   silencioTimer=setTimeout(()=>{
+     if(reconocimiento){
+       try{reconocimiento.stop();}catch(e){}
+     }
+   },1500);
+ };
 
-  reconocimiento.onresult = function(event){
-    if(procesando) return;
+ reconocimiento.onerror=(event)=>{
+   if(!activa||procesando)return;
+   if(event.error==="aborted")return;
+   if(event.error==="no-speech"){
+     reintentos++;
+     if(reintentos<=2){
+       estado("⚠️ No detecté voz. Vuelvo a preguntar...");
+       setTimeout(preguntar,800);
+     }else estado("⚠️ No detecté una respuesta. Pulsa REPETIR PREGUNTA.");
+     return;
+   }
+   estado("❌ Error de voz: "+event.error);
+ };
 
-    const texto = event.results[0][0].transcript.trim();
+ reconocimiento.onend=()=>{
+   clearTimeout(silencioTimer);
+   reconocimiento=null;
+   if(!activa||procesando)return;
 
-    if(!texto) return;
+   const texto=textoReconocido.trim();
+   if(!texto){
+     reintentos++;
+     if(reintentos<=2)setTimeout(preguntar,700);
+     else estado("⚠️ No detecté una respuesta. Pulsa REPETIR PREGUNTA.");
+     return;
+   }
 
-    procesando = true;
+   procesarRespuesta(texto);
+ };
 
-    const pregunta = preguntas[indice];
-    respuestas[pregunta.campo] = texto;
+ try{reconocimiento.start();}
+ catch(e){estado("❌ No se pudo iniciar el micrófono.");}
+}
 
-    document.getElementById("resultado").innerText = texto;
-    agregarHistorial(pregunta.texto, texto);
-    estado("✅ Respuesta capturada");
+function procesarRespuesta(texto){
+ if(procesando)return;
+ procesando=true;
 
-    if(reconocimiento){
-      try{ reconocimiento.stop(); }catch(e){}
-    }
+ const p=preguntas[indice];
+ let respuesta=texto;
 
-    // Da tiempo para que termine de procesar antes de la siguiente pregunta.
-    setTimeout(function(){
-      if(!activa) return;
+ if(p.tipo==="numero"){
+   const numero=convertirNumeroEspanol(texto);
+   if(numero!==null) respuesta=String(numero);
+ }
 
-      indice++;
+ respuestas[p.campo]=respuesta;
+ document.getElementById("resultado").innerText=respuesta;
+ agregarHistorial(p.texto,respuesta);
+ estado("✅ Respuesta capturada");
 
-      if(indice >= preguntas.length){
-        finalizar();
-      }else{
-        preguntar();
-      }
-    }, 1200);
-  };
+ setTimeout(()=>{
+   if(!activa)return;
+   indice++;
+   if(indice>=preguntas.length)finalizar();
+   else preguntar();
+ },1200);
+}
 
-  reconocimiento.onerror = function(event){
-    if(!activa || procesando) return;
+function convertirNumeroEspanol(texto){
+ let s=texto.toLowerCase()
+   .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+   .replace(/-/g," ")
+   .replace(/[.,]/g," ")
+   .trim();
 
-    console.log("Error:", event.error);
+ const directo=s.match(/\d+(?:[.,]\d+)?/);
+ if(directo){
+   const n=Number(directo[0].replace(",","."));
+   return Number.isFinite(n)?n:null;
+ }
 
-    if(event.error === "no-speech"){
-      estado("⚠️ No detecté respuesta. Volveré a preguntar.");
-      setTimeout(preguntar, 1000);
-      return;
-    }
+ const unidades={
+  cero:0,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,
+  diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,
+  dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,
+  veinte:20,veintiuno:21,veintiuna:21,veintidos:22,veintitres:23,veinticuatro:24,
+  veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,
+  treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,
+  cien:100,ciento:100,doscientos:200,trescientos:300,cuatrocientos:400,
+  quinientos:500,seiscientos:600,setecientos:700,ochocientos:800,novecientos:900,
+  mil:1000
+ };
 
-    if(event.error === "aborted") return;
+ s=s.replace(/\b(años?|anos?|kg|kilos?|kilogramos?)\b/g," ");
+ s=s.replace(/\s+/g," ").trim();
 
-    estado("❌ Error de voz: " + event.error);
-  };
+ const partes=s.split(" ");
+ let total=0,actual=0,encontro=false;
 
-  reconocimiento.onend = function(){
-    reconocimiento = null;
-  };
-
-  try{
-    reconocimiento.start();
-  }catch(error){
-    console.log(error);
-  }
+ for(const palabra of partes){
+   if(palabra==="y")continue;
+   if(unidades[palabra]!==undefined){
+     const v=unidades[palabra];
+     encontro=true;
+     if(v===1000){
+       total += (actual||1)*1000;
+       actual=0;
+     }else if(v>=100){
+       actual += v;
+     }else{
+       actual += v;
+     }
+   }else{
+     return null;
+   }
+ }
+ total+=actual;
+ return encontro && total>0 ? total : null;
 }
 
 function repetirPregunta(){
-  if(!activa) return;
-
-  if(reconocimiento){
-    try{ reconocimiento.abort(); }catch(e){}
-    reconocimiento = null;
-  }
-
-  window.speechSynthesis.cancel();
-  procesando = false;
-
-  setTimeout(preguntar, 300);
+ if(!activa)return;
+ if(reconocimiento){try{reconocimiento.abort();}catch(e){}}
+ clearTimeout(silencioTimer);
+ window.speechSynthesis.cancel();
+ procesando=false;textoReconocido="";reintentos=0;
+ setTimeout(preguntar,300);
 }
 
 function detener(){
-  activa = false;
-  procesando = true;
-
-  window.speechSynthesis.cancel();
-
-  if(reconocimiento){
-    try{ reconocimiento.abort(); }catch(e){}
-    reconocimiento = null;
-  }
-
-  estado("⏹️ Cuestionario detenido");
+ activa=false;procesando=true;clearTimeout(silencioTimer);
+ window.speechSynthesis.cancel();
+ if(reconocimiento){try{reconocimiento.abort();}catch(e){}reconocimiento=null;}
+ estado("⏹️ Cuestionario detenido");
 }
 
-function agregarHistorial(pregunta, respuesta){
-  const div = document.createElement("div");
-  div.className = "item";
-  div.innerHTML = "<strong>" + pregunta + "</strong><br>" + respuesta;
-  document.getElementById("historial").appendChild(div);
+function agregarHistorial(pregunta,respuesta){
+ const d=document.createElement("div");d.className="item";
+ d.innerHTML="<strong>"+pregunta+"</strong><br>"+respuesta;
+ document.getElementById("historial").appendChild(d);
 }
 
 function finalizar(){
-  activa = false;
-  procesando = true;
-
-  window.speechSynthesis.cancel();
-
-  if(reconocimiento){
-    try{ reconocimiento.abort(); }catch(e){}
-    reconocimiento = null;
-  }
-
-  document.getElementById("pregunta").innerText = "✅ Preguntas terminadas";
-  document.getElementById("resultado").innerText = "La captura de datos ha finalizado correctamente.";
-  estado("🎉 Se terminaron todas las preguntas");
-
-  document.getElementById("btnRepetir").classList.add("oculto");
-  document.getElementById("btnDetener").classList.add("oculto");
-  document.getElementById("btnIniciar").classList.remove("oculto");
-  document.getElementById("btnIniciar").innerText = "🔄 NUEVA PRUEBA";
+ activa=false;procesando=true;clearTimeout(silencioTimer);
+ window.speechSynthesis.cancel();
+ if(reconocimiento){try{reconocimiento.abort();}catch(e){}reconocimiento=null;}
+ document.getElementById("pregunta").innerText="✅ Preguntas terminadas";
+ document.getElementById("resultado").innerText="La captura de datos ha finalizado correctamente.";
+ estado("🎉 Se terminaron todas las preguntas");
+ document.getElementById("btnRepetir").classList.add("oculto");
+ document.getElementById("btnDetener").classList.add("oculto");
+ document.getElementById("btnIniciar").classList.remove("oculto");
+ document.getElementById("btnIniciar").innerText="🔄 NUEVA PRUEBA";
 }
 </script>
 </body>
