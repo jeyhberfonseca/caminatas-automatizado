@@ -3,58 +3,104 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Caminatas Automatizado - Prueba de voz</title>
+<title>Caminatas Automatizado</title>
 <style>
 body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:20px}
 .contenedor{max-width:520px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
-h1{text-align:center;font-size:24px}.pregunta{font-size:20px;font-weight:bold;margin:25px 0 15px}
-.resultado{min-height:55px;border:1px solid #ccc;border-radius:8px;padding:15px;font-size:18px;background:#fafafa}
+h1{text-align:center;font-size:24px}.pregunta{font-size:22px;font-weight:bold;margin:25px 0 15px}
+.resultado{min-height:60px;border:1px solid #ccc;border-radius:8px;padding:15px;font-size:19px;background:#fafafa}
 button{width:100%;padding:16px;margin-top:15px;font-size:18px;border:0;border-radius:8px;cursor:pointer}
-.voz{background:#1976d2;color:#fff}.limpiar{background:#777;color:#fff}
-.estado{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}
-.nota{font-size:14px;color:#555;margin-top:20px;line-height:1.5}
+.iniciar{background:#2e7d32;color:#fff}.voz{background:#1976d2;color:#fff}.siguiente{background:#555;color:#fff}
+.estado{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}.historial{margin-top:25px;border-top:1px solid #ddd;padding-top:15px}
+.item{padding:10px 0;border-bottom:1px solid #eee}.nota{font-size:14px;color:#555;margin-top:20px;line-height:1.5}
 </style>
 </head>
 <body>
 <div class="contenedor">
 <h1>🎙️ Caminatas Automatizado</h1>
-<div class="estado" id="estado">Listo para comenzar</div>
-<div class="pregunta">¿Cuál es el nombre del paciente?</div>
-<div class="resultado" id="resultado">Aquí aparecerá lo que digas...</div>
-<button class="voz" onclick="escuchar()">🎙️ RESPONDER POR VOZ</button>
-<button class="limpiar" onclick="limpiar()">Limpiar</button>
-<div class="nota">Esta es solamente la primera prueba. Todavía no guarda datos en Google Sheets. Primero comprobaremos que el reconocimiento de voz funciona correctamente.</div>
+<div class="estado" id="estado">Pulsa INICIAR para comenzar</div>
+<div class="pregunta" id="pregunta">Preparado</div>
+<div class="resultado" id="resultado">Aquí aparecerá tu respuesta...</div>
+<button class="iniciar" id="btnIniciar" onclick="iniciar()">▶️ INICIAR CUESTIONARIO</button>
+<button class="voz" id="btnVoz" onclick="escuchar()" style="display:none">🎙️ RESPONDER</button>
+<button class="siguiente" id="btnSiguiente" onclick="siguiente()" style="display:none">➡️ SIGUIENTE</button>
+<div class="historial"><strong>Respuestas:</strong><div id="historial"></div></div>
+<div class="nota">Prueba inicial: nombre, edad y peso. Todavía no guarda datos en Google Sheets.</div>
 </div>
 <script>
-function escuchar(){
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecognition){
-    document.getElementById("estado").innerText="❌ Este navegador no admite reconocimiento de voz.";
-    return;
-  }
-  const recognition = new SpeechRecognition();
-  recognition.lang="es-CO";
-  recognition.continuous=false;
-  recognition.interimResults=false;
-  recognition.maxAlternatives=1;
-  recognition.onstart=function(){
-    document.getElementById("estado").innerText="🎙️ ESCUCHANDO... HABLA AHORA";
-  };
-  recognition.onresult=function(event){
-    const texto=event.results[0][0].transcript;
-    document.getElementById("resultado").innerText=texto;
-    document.getElementById("estado").innerText="✅ Respuesta capturada";
-  };
-  recognition.onerror=function(event){
-    document.getElementById("estado").innerText="❌ Error: "+event.error;
-  };
-  recognition.onend=function(){console.log("Reconocimiento finalizado");};
-  try{recognition.start();}
-  catch(error){document.getElementById("estado").innerText="❌ No se pudo iniciar: "+error.message;}
+const preguntas=[
+{campo:"nombre",texto:"¿Cuál es el nombre del paciente?"},
+{campo:"edad",texto:"¿Cuál es la edad del paciente?"},
+{campo:"peso",texto:"¿Cuál es el peso del paciente en kilogramos?"}
+];
+let indice=0,respuestas={},respuestaActual="";
+
+function hablarTexto(texto){
+ if(!("speechSynthesis" in window)){document.getElementById("estado").innerText="⚠️ Tu navegador no permite hablar las preguntas.";return;}
+ window.speechSynthesis.cancel();
+ const voz=new SpeechSynthesisUtterance(texto);
+ voz.lang="es-CO";voz.rate=.95;voz.pitch=1;
+ voz.onstart=function(){document.getElementById("estado").innerText="🔊 Haciendo la pregunta...";};
+ voz.onend=function(){document.getElementById("estado").innerText="🎙️ Ahora puedes responder";};
+ window.speechSynthesis.speak(voz);
 }
-function limpiar(){
-  document.getElementById("resultado").innerText="Aquí aparecerá lo que digas...";
-  document.getElementById("estado").innerText="Listo para comenzar";
+
+function iniciar(){
+ indice=0;respuestas={};respuestaActual="";
+ document.getElementById("btnIniciar").style.display="none";
+ document.getElementById("btnVoz").style.display="block";
+ document.getElementById("btnSiguiente").style.display="none";
+ document.getElementById("historial").innerHTML="";
+ mostrarPregunta();
+}
+
+function mostrarPregunta(){
+ if(indice>=preguntas.length){finalizar();return;}
+ const pregunta=preguntas[indice];
+ document.getElementById("pregunta").innerText=pregunta.texto;
+ document.getElementById("resultado").innerText="Esperando respuesta...";
+ document.getElementById("btnVoz").style.display="block";
+ document.getElementById("btnSiguiente").style.display="none";
+ setTimeout(function(){hablarTexto(pregunta.texto);},500);
+}
+
+function escuchar(){
+ const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SpeechRecognition){document.getElementById("estado").innerText="❌ Este navegador no admite reconocimiento de voz.";return;}
+ const recognition=new SpeechRecognition();
+ recognition.lang="es-CO";recognition.continuous=false;recognition.interimResults=false;recognition.maxAlternatives=1;
+ recognition.onstart=function(){document.getElementById("estado").innerText="🎙️ ESCUCHANDO... HABLA AHORA";};
+ recognition.onresult=function(event){
+  respuestaActual=event.results[0][0].transcript;
+  document.getElementById("resultado").innerText=respuestaActual;
+  document.getElementById("estado").innerText="✅ Respuesta capturada";
+  document.getElementById("btnSiguiente").style.display="block";
+ };
+ recognition.onerror=function(event){document.getElementById("estado").innerText="❌ Error de voz: "+event.error;};
+ try{recognition.start();}catch(error){document.getElementById("estado").innerText="❌ No se pudo iniciar el micrófono.";}
+}
+
+function siguiente(){
+ if(!respuestaActual){document.getElementById("estado").innerText="⚠️ Primero debes responder.";return;}
+ const pregunta=preguntas[indice];
+ respuestas[pregunta.campo]=respuestaActual;
+ agregarHistorial(pregunta.texto,respuestaActual);
+ respuestaActual="";indice++;mostrarPregunta();
+}
+
+function agregarHistorial(pregunta,respuesta){
+ const div=document.createElement("div");div.className="item";
+ div.innerHTML="<strong>"+pregunta+"</strong><br>"+respuesta;
+ document.getElementById("historial").appendChild(div);
+}
+
+function finalizar(){
+ document.getElementById("pregunta").innerText="✅ Cuestionario terminado";
+ document.getElementById("resultado").innerText="Datos capturados correctamente.";
+ document.getElementById("estado").innerText="🎉 Prueba completada";
+ document.getElementById("btnVoz").style.display="none";
+ document.getElementById("btnSiguiente").style.display="none";
+ console.log("RESPUESTAS:",respuestas);
 }
 </script>
 </body>
