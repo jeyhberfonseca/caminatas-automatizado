@@ -1,29 +1,524 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Caminatas Automatizado</title><style>body{font-family:Arial;background:#f4f6f8;padding:20px}.box{max-width:560px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 2px 10px #bbb}h1{text-align:center}.q{font-size:22px;font-weight:bold;margin:25px 0 15px}.r{min-height:60px;border:1px solid #ccc;border-radius:8px;padding:15px;font-size:19px}button{width:100%;padding:15px;margin-top:15px;font-size:18px;border:0;border-radius:8px}.start{background:#2e7d32;color:white}.repeat{background:#1976d2;color:white}.stop{background:#777;color:white}.hide{display:none}.state{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}.item{padding:10px 0;border-bottom:1px solid #eee}</style></head><body><div class="box"><h1>🎙️ Caminatas Automatizado</h1><div id="estado" class="state">Pulsa INICIAR</div><div id="pregunta" class="q">Preparado</div><div id="respuesta" class="r">Aquí aparecerá tu respuesta...</div><button id="btnIniciar" class="start">▶️ INICIAR CUESTIONARIO</button><button id="btnRepetir" class="repeat hide">🔊 REPETIR</button><button id="btnDetener" class="stop hide">⏹️ DETENER</button><hr><b>Datos confirmados:</b><div id="lista"></div></div><script>const P=[{c:"nombre",q:"¿Cuál es el nombre del paciente?",t:"text"},{c:"edad",q:"¿Cuál es la edad del paciente?",t:"num",min:1,max:120,u:"años"},{c:"peso",q:"¿Cuál es el peso del paciente en kilogramos?",t:"num",min:20,max:300,u:"kilogramos"}];let i=0,on=false,rec=null,mode="a",txt="",pending=null,timer=null,busy=false;const E=id=>document.getElementById(id),st=x=>E("estado").textContent=x;function iniciar(){if(!(window.SpeechRecognition||window.webkitSpeechRecognition)){st("❌ Usa Google Chrome para reconocimiento de voz.");return}on=true;i=0;busy=false;E("btnIniciar").classList.add("hide");E("btnRepetir").classList.remove("hide");E("btnDetener").classList.remove("hide");E("lista").innerHTML="";ask()}function ask(){if(!on)return;if(i>=P.length){finish();return}mode="a";busy=false;txt="";pending=null;let p=P[i];E("pregunta").textContent=p.q;E("respuesta").textContent="Esperando respuesta...";speechSynthesis.cancel();let v=new SpeechSynthesisUtterance(p.q);v.lang="es-CO";v.rate=.88;v.onstart=()=>st("🔊 Haciendo la pregunta...");v.onend=()=>{if(on){st("⏳ Prepárate para responder...");setTimeout(listen,1200)}};speechSynthesis.speak(v)}function listen(){if(!on||busy)return;let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;rec=new SR();rec.lang="es-CO";rec.continuous=true;rec.interimResults=true;txt="";rec.onstart=()=>st("🎙️ ESCUCHANDO... HABLA AHORA");rec.onresult=e=>{let tmp="";for(let n=e.resultIndex;n<e.results.length;n++){let x=e.results[n][0].transcript.trim();if(e.results[n].isFinal)txt+=" "+x;else tmp+=" "+x}E("respuesta").textContent=(txt+" "+tmp).trim()||"🎙️ Te escucho...";clearTimeout(timer);timer=setTimeout(()=>{try{rec.stop()}catch(e){}},1400)};rec.onerror=e=>{if(e.error!=="aborted")st(e.error==="no-speech"?"⚠️ No detecté voz. Repito...":"❌ Error de voz: "+e.error)};rec.onend=()=>{clearTimeout(timer);rec=null;if(!on||busy)return;if(!txt.trim()){setTimeout(ask,700);return}if(mode==="c")confirmAnswer(txt.trim());else answer(txt.trim())};try{rec.start()}catch(e){}}function answer(x){let p=P[i],v=x;if(p.t==="num"){v=num(x);if(v===null||v<p.min||v>p.max){st("⚠️ Dato no válido. Lo vuelvo a preguntar.");setTimeout(ask,900);return}}pending=v;mode="c";confirm()}function confirm(){let p=P[i],m=p.t==="text"?`Entendí ${pending}. ¿Es correcto? Responde sí o no.`:`Entendí ${pending} ${p.u}. ¿Es correcto? Responde sí o no.`;E("pregunta").textContent=m;E("respuesta").textContent=pending;speechSynthesis.cancel();let v=new SpeechSynthesisUtterance(m);v.lang="es-CO";v.rate=.88;v.onend=()=>{if(on){st("🎙️ Responde sí o no");setTimeout(listen,800)}};speechSynthesis.speak(v)}function confirmAnswer(x){
- let s=x.toLowerCase()
-  .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-  .replace(/[¿?¡!.,;:]/g," ").replace(/\s+/g," ").trim();
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caminatas Automatizado</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:20px}
+.box{max-width:560px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+h1{text-align:center;font-size:24px}.q{font-size:21px;font-weight:bold;margin:25px 0 15px}
+.r{min-height:60px;border:1px solid #ccc;border-radius:8px;padding:15px;font-size:19px;background:#fafafa}
+button{width:100%;padding:15px;margin-top:15px;font-size:18px;border:0;border-radius:8px;cursor:pointer}
+.start{background:#2e7d32;color:#fff}.repeat{background:#1976d2;color:#fff}.stop{background:#777;color:#fff}
+.hide{display:none}.state{text-align:center;font-weight:bold;margin:18px 0;min-height:25px}
+.item{padding:10px 0;border-bottom:1px solid #eee}
+</style>
+</head>
+<body>
+<div class="box">
+<h1>🎙️ Caminatas Automatizado</h1>
+<div id="estado" class="state">Pulsa INICIAR</div>
+<div id="pregunta" class="q">Preparado</div>
+<div id="respuesta" class="r">Aquí aparecerá tu respuesta...</div>
 
- const yes=/^(si|correcto|correcta|exacto|exacta|afirmativo)(\s|$)/.test(s);
- const no=/^(no|incorrecto|incorrecta|negativo)(\s|$)/.test(s);
+<button id="btnIniciar" class="start">▶️ INICIAR CUESTIONARIO</button>
+<button id="btnRepetir" class="repeat hide">🔊 REPETIR</button>
+<button id="btnDetener" class="stop hide">⏹️ DETENER</button>
 
- if(yes){
-   busy=true;
-   let p=P[i];
-   E("lista").insertAdjacentHTML("beforeend",`<div class="item"><b>${p.q}</b><br>${pending}${p.u?" "+p.u:""}</div>`);
-   st("✅ Dato confirmado");
-   setTimeout(()=>{
-     i++;
-     if(i>=P.length) finish();
-     else ask();
-   },900);
- }else if(no){
-   busy=true;
-   st("🔄 Repetimos la pregunta.");
-   setTimeout(ask,800);
- }else{
-   busy=false;
-   st("⚠️ No entendí. Responde sí o no.");
-   setTimeout(confirm,500);
- }
+<hr>
+<b>Datos confirmados:</b>
+<div id="lista"></div>
+</div>
+
+<script>
+const preguntas = [
+  {campo:"nombre", texto:"¿Cuál es el nombre del paciente?", tipo:"texto"},
+  {campo:"edad", texto:"¿Cuál es la edad del paciente?", tipo:"numero", min:1, max:120, unidad:"años"},
+  {campo:"peso", texto:"¿Cuál es el peso del paciente en kilogramos?", tipo:"numero", min:20, max:300, unidad:"kilogramos"}
+];
+
+let indice = 0;
+let activo = false;
+let reconocimiento = null;
+let modo = "respuesta";
+let valorPendiente = null;
+let procesando = false;
+let temporizador = null;
+
+const estado = document.getElementById("estado");
+const pregunta = document.getElementById("pregunta");
+const respuesta = document.getElementById("respuesta");
+const lista = document.getElementById("lista");
+const btnIniciar = document.getElementById("btnIniciar");
+const btnRepetir = document.getElementById("btnRepetir");
+const btnDetener = document.getElementById("btnDetener");
+
+function ponerEstado(t){ estado.textContent = t; }
+
+function hablar(texto, alTerminar){
+  window.speechSynthesis.cancel();
+
+  const voz = new SpeechSynthesisUtterance(texto);
+  voz.lang = "es-CO";
+  voz.rate = 0.88;
+  voz.pitch = 1;
+
+  voz.onend = function(){
+    if(!activo) return;
+    setTimeout(alTerminar, 1000);
+  };
+
+  voz.onerror = function(){
+    if(!activo) return;
+    setTimeout(alTerminar, 700);
+  };
+
+  window.speechSynthesis.speak(voz);
 }
-function num(x){let s=x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/-/g," ").replace(/[.,]/g," ").replace(/\b(años?|anos?|kg|kilos?|kilogramos?)\b/g," ").replace(/\s+/g," ").trim(),d=s.match(/\d+(?:\.\d+)?/);if(d)return Number(d[0]);let u={cero:0,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,veintiuno:21,veintiuna:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,cien:100,ciento:100,doscientos:200,trescientos:300,cuatrocientos:400,quinientos:500,seiscientos:600,setecientos:700,ochocientos:800,novecientos:900,mil:1000},a=0,t=0;for(let w of s.split(" ")){if(w==="y")continue;if(u[w]===undefined)return null;u[w]===1000?(t+=(a||1)*1000,a=0):a+=u[w]}return t+a||null}function repeatQ(){if(!on)return;speechSynthesis.cancel();if(rec)try{rec.abort()}catch(e){}busy=false;setTimeout(ask,300)}function stopQ(){on=false;busy=true;speechSynthesis.cancel();if(rec)try{rec.abort()}catch(e){}rec=null;st("⏹️ Cuestionario detenido")}function finish(){on=false;busy=true;speechSynthesis.cancel();E("pregunta").textContent="✅ Preguntas terminadas";E("respuesta").textContent="Todos los datos fueron confirmados.";st("🎉 Se terminaron y confirmaron todas las preguntas");E("btnRepetir").classList.add("hide");E("btnDetener").classList.add("hide");E("btnIniciar").classList.remove("hide");E("btnIniciar").textContent="🔄 NUEVA PRUEBA"}E("btnIniciar").addEventListener("click",iniciar);E("btnRepetir").addEventListener("click",repeatQ);E("btnDetener").addEventListener("click",stopQ);</script></body></html>
+
+function iniciarCuestionario(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SR){
+    ponerEstado("❌ Usa Google Chrome para el reconocimiento de voz.");
+    return;
+  }
+
+  activo = true;
+  indice = 0;
+  modo = "respuesta";
+  valorPendiente = null;
+  procesando = false;
+  lista.innerHTML = "";
+
+  btnIniciar.classList.add("hide");
+  btnRepetir.classList.remove("hide");
+  btnDetener.classList.remove("hide");
+
+  preguntar();
+}
+
+function preguntar(){
+  if(!activo) return;
+
+  if(indice >= preguntas.length){
+    finalizar();
+    return;
+  }
+
+  if(reconocimiento){
+    try{ reconocimiento.abort(); }catch(e){}
+    reconocimiento = null;
+  }
+
+  clearTimeout(temporizador);
+
+  modo = "respuesta";
+  valorPendiente = null;
+  procesando = false;
+
+  const p = preguntas[indice];
+
+  pregunta.textContent = p.texto;
+  respuesta.textContent = "Esperando respuesta...";
+  ponerEstado("🔊 Haciendo la pregunta...");
+
+  hablar(p.texto, function(){
+    if(!activo) return;
+    ponerEstado("🎙️ Prepárate para responder...");
+    setTimeout(function(){
+      if(activo) escucharRespuesta();
+    }, 700);
+  });
+}
+
+function escucharRespuesta(){
+  if(!activo || procesando) return;
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SR){
+    ponerEstado("❌ El reconocimiento de voz no está disponible.");
+    return;
+  }
+
+  if(reconocimiento){
+    try{ reconocimiento.abort(); }catch(e){}
+  }
+
+  const r = new SR();
+
+  reconocimiento = r;
+  r.lang = "es-CO";
+
+  // Una respuesta = una sesión. Esto evita que Chrome se quede
+  // en estado "escuchando" al pasar a la siguiente pregunta.
+  r.continuous = false;
+  r.interimResults = false;
+  r.maxAlternatives = 3;
+
+  let terminado = false;
+
+  ponerEstado("🎙️ ESCUCHANDO... HABLA AHORA");
+  respuesta.textContent = "🎙️ Te estoy escuchando...";
+
+  r.onresult = function(event){
+    if(terminado) return;
+    terminado = true;
+
+    let mejor = "";
+
+    // Elegimos la alternativa con mayor confianza.
+    let mejorConfianza = -1;
+
+    for(let i=0; i<event.results[0].length; i++){
+      const alt = event.results[0][i];
+      if(alt.confidence > mejorConfianza){
+        mejorConfianza = alt.confidence;
+        mejor = alt.transcript;
+      }
+    }
+
+    mejor = mejor.trim();
+
+    if(reconocimiento === r){
+      try{ r.stop(); }catch(e){}
+    }
+
+    procesarTextoReconocido(mejor);
+  };
+
+  r.onerror = function(event){
+    if(terminado) return;
+    terminado = true;
+
+    if(reconocimiento === r) reconocimiento = null;
+
+    if(event.error === "aborted") return;
+
+    if(event.error === "no-speech"){
+      ponerEstado("⚠️ No detecté voz. Repetimos la pregunta.");
+      setTimeout(function(){
+        if(activo) preguntar();
+      },800);
+      return;
+    }
+
+    if(event.error === "not-allowed"){
+      ponerEstado("❌ Chrome no tiene permiso para usar el micrófono.");
+      return;
+    }
+
+    ponerEstado("❌ Error de voz: " + event.error);
+  };
+
+  r.onend = function(){
+    if(reconocimiento === r){
+      reconocimiento = null;
+    }
+
+    // Si onresult ya procesó el dato, no hacemos nada.
+    if(terminado) return;
+
+    if(!activo || procesando) return;
+
+    ponerEstado("⚠️ No detecté una respuesta. Repetimos.");
+    setTimeout(function(){
+      if(activo) preguntar();
+    },700);
+  };
+
+  try{
+    r.start();
+  }catch(e){
+    reconocimiento = null;
+    ponerEstado("⚠️ No se pudo iniciar la escucha. Reintentando...");
+    setTimeout(function(){
+      if(activo) escucharRespuesta();
+    },800);
+  }
+}
+
+function procesarTextoReconocido(texto){
+  if(!activo || procesando) return;
+
+  if(!texto){
+    ponerEstado("⚠️ No recibí una respuesta.");
+    setTimeout(preguntar,700);
+    return;
+  }
+
+  respuesta.textContent = texto;
+
+  if(modo === "confirmacion"){
+    procesarConfirmacion(texto);
+  }else{
+    procesarDato(texto);
+  }
+}
+
+function procesarDato(texto){
+  const p = preguntas[indice];
+
+  let valor = texto;
+
+  if(p.tipo === "numero"){
+    valor = convertirNumero(texto);
+
+    if(valor === null){
+      ponerEstado("⚠️ No pude identificar el número. Repetimos.");
+      setTimeout(preguntar,900);
+      return;
+    }
+
+    if(valor < p.min || valor > p.max){
+      ponerEstado("⚠️ El valor está fuera del rango esperado. Repetimos.");
+      setTimeout(preguntar,900);
+      return;
+    }
+  }
+
+  valorPendiente = valor;
+  modo = "confirmacion";
+  procesando = false;
+
+  confirmarDato();
+}
+
+function confirmarDato(){
+  if(!activo) return;
+
+  const p = preguntas[indice];
+
+  const mensaje =
+    p.tipo === "texto"
+    ? "Entendí " + valorPendiente + ". ¿Es correcto? Responde sí o no."
+    : "Entendí " + valorPendiente + " " + p.unidad + ". ¿Es correcto? Responde sí o no.";
+
+  pregunta.textContent = mensaje;
+  respuesta.textContent = valorPendiente;
+  ponerEstado("🔎 Confirmando el dato...");
+
+  hablar(mensaje, function(){
+    if(!activo) return;
+
+    ponerEstado("🎙️ Responde sí o no");
+
+    setTimeout(function(){
+      if(activo){
+        // Muy importante: permitir que la nueva instancia se cree
+        // después de que terminó completamente la anterior.
+        escucharRespuesta();
+      }
+    },500);
+  });
+}
+
+function procesarConfirmacion(texto){
+  if(!activo || procesando) return;
+
+  const s = texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/[¿?¡!.,;:]/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+
+  // Reconoce "sí", "si", "sí es correcto", "sí correcto",
+  // "correcto", "exacto", etc.
+  const esSi =
+    s === "si" ||
+    s === "sí" ||
+    s === "correcto" ||
+    s === "correcta" ||
+    s === "exacto" ||
+    s === "exacta" ||
+    s.startsWith("si ") ||
+    s.startsWith("sí ") ||
+    s.startsWith("correcto ") ||
+    s.startsWith("correcta ") ||
+    s.startsWith("exacto ") ||
+    s.startsWith("exacta ");
+
+  const esNo =
+    s === "no" ||
+    s === "incorrecto" ||
+    s === "incorrecta" ||
+    s.startsWith("no ") ||
+    s.startsWith("incorrecto ") ||
+    s.startsWith("incorrecta ");
+
+  if(esSi){
+    procesando = true;
+
+    const p = preguntas[indice];
+    const dato = valorPendiente + (p.unidad ? " " + p.unidad : "");
+
+    agregarDato(p.texto, dato);
+    ponerEstado("✅ Dato confirmado");
+
+    // Limpiamos el reconocimiento y pasamos a la siguiente pregunta.
+    if(reconocimiento){
+      try{ reconocimiento.abort(); }catch(e){}
+      reconocimiento = null;
+    }
+
+    setTimeout(function(){
+      indice++;
+
+      if(indice >= preguntas.length){
+        finalizar();
+      }else{
+        preguntar();
+      }
+    },1000);
+
+    return;
+  }
+
+  if(esNo){
+    procesando = true;
+    ponerEstado("🔄 De acuerdo. Repetimos la pregunta.");
+
+    setTimeout(function(){
+      preguntar();
+    },800);
+
+    return;
+  }
+
+  // No entendió "sí/no": no perdemos el dato pendiente.
+  ponerEstado("⚠️ No entendí. Responde sí o no.");
+
+  const mensaje = "No entendí. Por favor responde sí o no.";
+
+  hablar(mensaje, function(){
+    if(!activo) return;
+    ponerEstado("🎙️ Responde sí o no");
+    setTimeout(function(){
+      if(activo) escucharRespuesta();
+    },500);
+  });
+}
+
+function convertirNumero(texto){
+  let s = texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/-/g," ")
+    .replace(/[.,]/g," ")
+    .replace(/\b(años?|anos?|kg|kilos?|kilogramos?)\b/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+
+  const directo = s.match(/\d+(?:\.\d+)?/);
+  if(directo) return Number(directo[0]);
+
+  const n = {
+    cero:0,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,
+    ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,
+    dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,
+    veintiuno:21,veintiuna:21,veintidos:22,veintitres:23,veinticuatro:24,
+    veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,
+    treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,
+    noventa:90,cien:100,ciento:100,doscientos:200,trescientos:300,
+    cuatrocientos:400,quinientos:500,seiscientos:600,setecientos:700,
+    ochocientos:800,novecientos:900,mil:1000
+  };
+
+  let total=0;
+  let actual=0;
+  let encontrado=false;
+
+  for(const palabra of s.split(" ")){
+    if(palabra === "y") continue;
+    if(n[palabra] === undefined) return null;
+
+    encontrado=true;
+    const v=n[palabra];
+
+    if(v === 1000){
+      total += (actual || 1) * 1000;
+      actual=0;
+    }else{
+      actual += v;
+    }
+  }
+
+  total += actual;
+
+  return encontrado && total > 0 ? total : null;
+}
+
+function agregarDato(preguntaTexto,dato){
+  const div=document.createElement("div");
+  div.className="item";
+  div.innerHTML="<b>"+preguntaTexto+"</b><br>"+dato;
+  lista.appendChild(div);
+}
+
+function repetirPregunta(){
+  if(!activo) return;
+
+  if(reconocimiento){
+    try{ reconocimiento.abort(); }catch(e){}
+    reconocimiento=null;
+  }
+
+  window.speechSynthesis.cancel();
+  procesando=false;
+
+  setTimeout(function(){
+    if(activo){
+      if(modo==="confirmacion") confirmarDato();
+      else preguntar();
+    }
+  },300);
+}
+
+function detenerCuestionario(){
+  activo=false;
+  procesando=true;
+
+  clearTimeout(temporizador);
+  window.speechSynthesis.cancel();
+
+  if(reconocimiento){
+    try{ reconocimiento.abort(); }catch(e){}
+  }
+
+  reconocimiento=null;
+  ponerEstado("⏹️ Cuestionario detenido");
+}
+
+function finalizar(){
+  activo=false;
+  procesando=true;
+
+  window.speechSynthesis.cancel();
+
+  if(reconocimiento){
+    try{ reconocimiento.abort(); }catch(e){}
+  }
+
+  reconocimiento=null;
+
+  pregunta.textContent="✅ Preguntas terminadas";
+  respuesta.textContent="Todos los datos fueron confirmados.";
+  ponerEstado("🎉 Se terminaron y confirmaron todas las preguntas");
+
+  btnRepetir.classList.add("hide");
+  btnDetener.classList.add("hide");
+  btnIniciar.classList.remove("hide");
+  btnIniciar.textContent="🔄 NUEVA PRUEBA";
+}
+
+btnIniciar.addEventListener("click", iniciarCuestionario);
+btnRepetir.addEventListener("click", repetirPregunta);
+btnDetener.addEventListener("click", detenerCuestionario);
+</script>
+</body>
+</html>
